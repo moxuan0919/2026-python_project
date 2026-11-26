@@ -1,42 +1,71 @@
-"""combos.py ─ 組合判定與計分
-
-【負責】A（核心邏輯）
-
-已決定的規則解釋（要改請全組一起討論）：
-  1. 組合「包含即可」：只要出的牌裡含有所需零件就算，多出來的牌只算基礎分。
-     多種組合同時成立時，只取額外分數最高的一種。
-  2. evaluate_combo 回傳「原始」額外分數；精密加工（combo_rate）在 calculate_score 才乘。
-  3. 得分 = (基礎分數總和 + 組合額外分數 × combo_rate) × multiplier，最後四捨五入成 int。
-"""
 from collections import Counter
-from cards import Card, PlayerStats, GEAR, WIRE, BATTERY, CHIP
+from cards import get_card_points, is_valid_card
 
-# (組合名稱, 所需零件, 額外分數) ─ 資料表已填好，A 只需寫判定邏輯
 COMBOS = [
-    ("傳動裝置", Counter({GEAR: 2}), 30),
-    ("線路系統", Counter({WIRE: 2}), 40),
-    ("儲能裝置", Counter({BATTERY: 2}), 50),
-    ("運算核心", Counter({CHIP: 2}), 60),
-    ("電力模組", Counter({BATTERY: 1, WIRE: 1}), 40),
-    ("控制模組", Counter({BATTERY: 1, WIRE: 1, CHIP: 1}), 100),
-    ("重型引擎", Counter({GEAR: 2, BATTERY: 1}), 120),
-    ("完整機械", Counter({GEAR: 1, WIRE: 1, BATTERY: 1, CHIP: 1}), 200),
+    ("傳動裝置", {"gear": 2}, 30),
+    ("線路系統", {"wire": 2}, 40),
+    ("儲能裝置", {"battery": 2}, 50),
+    ("運算核心", {"chip": 2}, 60),
+    ("電力模組", {"battery": 1, "wire": 1}, 40),
+    ("控制模組", {"battery": 1, "wire": 1, "chip": 1}, 100),
+    ("重型引擎", {"gear": 2, "battery": 1}, 120),
+    ("完整機械", {"gear": 1, "wire": 1,
+                  "battery": 1, "chip": 1}, 200)
 ]
 
+def validate_cards(cards):
+    if not 1 <= len(cards) <= 4:
+        raise ValueError("每次必須打出1至4張卡牌")
 
-def evaluate_combo(cards: list) -> tuple:
-    """判定這次出的牌符合哪個組合。
+    for card in cards:
+        if not is_valid_card(card):
+            raise ValueError("無效的卡牌")
 
-    回傳 (組合名稱, 原始額外分數)；沒有任何組合回傳 ("無", 0)。
-    """
-    raise NotImplementedError("A：請實作")
+def detect_combo(cards):
+    validate_cards(cards)
 
+    card_counts = Counter(cards)
 
-def calculate_score(cards: list, stats: PlayerStats) -> int:
-    """計算單次出牌得分。
+    best_name = "無組合"
+    best_bonus = 0
 
-    基礎分數用 stats.base_scores[card.kind]（不是固定值，因為有升級）。
-    範例（倍率 1.0）：電池、電線、晶片 → 20+15+25 + 控制模組 100 = 160
-    範例（倍率 1.2）：同上 → 192
-    """
-    raise NotImplementedError("A：請實作")
+    for name, requirements, bonus in COMBOS:
+
+        if all(card_counts[card] >= count
+               for card, count in requirements.items()):
+
+            if bonus > best_bonus:
+                best_name = name
+                best_bonus = bonus
+
+    return best_name, best_bonus
+
+def calculate_base_score(cards, card_bonuses=None):
+    validate_cards(cards)
+
+    return sum(
+        get_card_points(card, card_bonuses)
+        for card in cards
+    )
+
+def calculate_score(cards, card_bonuses=None,
+                    combo_multiplier=1.0,
+                    score_multiplier=1.0):
+
+    base_score = calculate_base_score(cards, card_bonuses)
+
+    combo_name, combo_bonus = detect_combo(cards)
+
+    combo_bonus *= combo_multiplier
+
+    total_score = round(
+        (base_score + combo_bonus) * score_multiplier
+    )
+
+    return {
+        "combo_name": combo_name,
+        "base_score": base_score,
+        "combo_bonus": combo_bonus,
+        "score_multiplier": score_multiplier,
+        "total_score": total_score
+    }

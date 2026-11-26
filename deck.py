@@ -1,28 +1,62 @@
-"""deck.py ─ 牌堆（抽牌堆 + 棄牌堆）
+import random
+from cards import CARD_COUNTS
 
-【負責】A（核心邏輯）
-"""
-from cards import Card, build_deck
+def create_deck():
+    deck = []
 
+    for card, count in CARD_COUNTS.items():
+        deck.extend([card] * count)
 
-class Deck:
-    def __init__(self):
-        """建立 40 張牌並洗牌。"""
-        raise NotImplementedError("A：請實作")
+    return deck
 
-    def draw(self, n: int) -> list:
-        """抽 n 張回傳。抽牌堆不夠時，把棄牌堆洗回去再抽；真的不夠就有幾張給幾張。"""
-        raise NotImplementedError("A：請實作")
+def shuffle_deck(deck):
+    random.shuffle(deck)
 
-    def discard(self, cards: list) -> None:
-        """把用掉或丟掉的牌放進棄牌堆。"""
-        raise NotImplementedError("A：請實作")
+def draw_cards(deck, count):
+    drawn_cards = []
 
-    def reset(self) -> None:
-        """每關開始：所有牌（含棄牌堆）全部收回並重新洗牌。"""
-        raise NotImplementedError("A：請實作")
+    for _ in range(count):
+        if not deck:
+            break
 
-    @property
-    def remaining(self) -> int:
-        """抽牌堆剩餘張數。"""
-        raise NotImplementedError("A：請實作")
+        drawn_cards.append(deck.pop())
+
+    return drawn_cards
+
+def discard_cards(hand, discard_pile, indices):
+    if len(indices) != len(set(indices)):
+        raise ValueError("不可重複選擇同一張卡牌")
+
+    if any(i < 0 or i >= len(hand) for i in indices):
+        raise ValueError("卡牌索引超出範圍")
+
+    removed_cards = [hand[i] for i in indices]
+
+    for i in sorted(indices, reverse=True):
+        hand.pop(i)
+
+    discard_pile.extend(removed_cards)
+
+    return removed_cards
+
+def refill_hand(deck, hand, hand_limit=8):
+    count = max(0, hand_limit - len(hand))
+
+    hand.extend(draw_cards(deck, count))
+
+    return hand
+
+def initialize_deck(hand_limit=8):
+    deck = create_deck()
+    shuffle_deck(deck)
+
+    hand = draw_cards(deck, hand_limit)
+    discard_pile = []
+
+    return deck, hand, discard_pile
+
+def get_deck_count(deck):
+    return len(deck)
+
+def get_discard_count(discard_pile):
+    return len(discard_pile)
